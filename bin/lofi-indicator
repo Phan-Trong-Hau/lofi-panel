@@ -10,7 +10,7 @@ Features:
  - Left-click panel icon -> Toggles interactive Mini Control UI Window
  - Independent Lofi volume control (separate from master system output)
  - Real-time Sound Wave Equalizer
- - One-click buttons for all 9 diverse radio channels
+ - One-click buttons for all 15 diverse radio channels
  - Auto-starts with system on login
  - All-English UI interface
 """
@@ -89,6 +89,42 @@ STATIONS = [
         "genre": "Dreamy Retro Synth & Chillwave",
         "url": "https://ice1.somafm.com/vaporwaves-128-mp3",
         "color": "#f43f5e"
+    },
+    {
+        "name": "🏮 Chinese Hits",
+        "genre": "C-Pop & Mandarin Melodies",
+        "url": "https://antares.dribbcast.com/proxy/cpop?mp=/s",
+        "color": "#f43f5e"
+    },
+    {
+        "name": "🎹 Solo Piano",
+        "genre": "Whisperings Peaceful Solo Piano",
+        "url": "http://pianosolo.streamguys.net/live",
+        "color": "#818cf8"
+    },
+    {
+        "name": "🇻🇳 Vietnam Hits",
+        "genre": "National Music & Melodies (VOV3)",
+        "url": "https://str.vov.gov.vn/vovlive/vov3.sdp_aac/playlist.m3u8",
+        "color": "#f59e0b"
+    },
+    {
+        "name": "🎋 Flute & Strings",
+        "genre": "Traditional Bamboo Flute & Guzheng",
+        "url": "https://radio.chinesemusicworld.com/chinesemusic.ogg",
+        "color": "#10b981"
+    },
+    {
+        "name": "📻 V-Pop Radio",
+        "genre": "Contemporary Vietnamese Pop & Chill",
+        "url": "https://stream.zeno.fm/4q7y9hvkp2zuv",
+        "color": "#fb7185"
+    },
+    {
+        "name": "🎐 Zen Flute",
+        "genre": "Relaxing Meditation & Bamboo Flute",
+        "url": "http://air.radioart.com/fShakuhachi.mp3",
+        "color": "#14b8a6"
     }
 ]
 
@@ -359,7 +395,7 @@ class LofiControlWindow(Gtk.Window):
         self.app = app
 
         self.set_title("☕ Lofi Music Control")
-        self.set_default_size(360, 320)
+        self.set_default_size(380, 420)
         self.set_resizable(False)
         self.set_keep_above(True)
         self.set_decorated(False)
@@ -594,7 +630,7 @@ class LofiPanelApp:
 
         # Position window near top right (under top panel)
         screen = Gdk.Screen.get_default()
-        self.ui_win.move(screen.get_width() - 380, 48)
+        self.ui_win.move(screen.get_width() - 400, 48)
 
         # Setup DBus StatusNotifierItem on Top Panel
         self.bus = SessionMessageBus()
@@ -626,7 +662,7 @@ class LofiPanelApp:
             self.ui_win.hide()
         else:
             screen = Gdk.Screen.get_default()
-            self.ui_win.move(screen.get_width() - 380, 48)
+            self.ui_win.move(screen.get_width() - 400, 48)
             self.ui_win.show_all()
             self.ui_win.present()
 

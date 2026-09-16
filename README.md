@@ -2,7 +2,7 @@
 
 A lightweight, zero-disk-space Lofi & Ambient radio indicator that lives directly inside your Linux Top Panel (COSMIC Desktop / GNOME / FreeDesktop SNI).
 
-Features an **animated dancing pixel cat** wearing headphones, real-time sound wave equalizer, independent volume control, and 9 diverse curated 24/7 internet radio stations.
+Features an **animated dancing pixel cat** wearing headphones, real-time sound wave equalizer, independent volume control, and 15 diverse curated 24/7 internet radio stations.
 
 ---
 
@@ -12,7 +12,7 @@ Features an **animated dancing pixel cat** wearing headphones, real-time sound w
 - **Interactive Mini Control UI**: Left-click the panel cat to open a sleek popover window with big playback buttons, live equalizer, and station selector.
 - **Independent Volume Control**: Adjust the radio's background volume (0% - 100%) without altering your master system output volume.
 - **0 MB Disk Space**: Streams 24/7 radio channels entirely in memory via GStreamer (`playbin`). No audio files are downloaded to disk.
-- **9 Curated Stations**:
+- **15 Curated Stations**:
   1. ☕ **Lofi Hip Hop**: Relaxing study beats & chilled vinyl vibes
   2. 🌧️ **Rainy Cafe**: Cozy piano melodies with soft rain ambiance
   3. 🌿 **Groove Salad**: SomaFM's acclaimed downtempo ambient chillout
@@ -22,6 +22,12 @@ Features an **animated dancing pixel cat** wearing headphones, real-time sound w
   7. 🎹 **Lush Mellow**: Sensuous electronic sounds with soft vocals
   8. 🕹️ **DEF CON Cyber**: Hacker chiptunes & 8-bit electronic beats
   9. 🪐 **Vaporwaves**: Nostalgic 80s synth & dreamy chillwave
+  10. 🏮 **Chinese Hits**: C-Pop hits & Mandarin melodious tunes
+  11. 🎹 **Solo Piano**: Whisperings peaceful and emotional acoustic solo piano
+  12. 🇻🇳 **Vietnam Hits**: Vietnamese national music, popular melodies & chill (VOV3)
+  13. 🎋 **Flute & Strings**: Traditional Asian bamboo flute, guzheng, pipa & strings
+  14. 📻 **V-Pop Radio**: Contemporary Vietnamese pop hits & chill tracks
+  15. 🎐 **Zen Flute**: Relaxing Japanese shakuhachi meditation & bamboo flute
 - **Auto-Start**: Automatically launches on system boot/login.
 
 ---

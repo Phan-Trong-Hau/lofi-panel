@@ -6,9 +6,10 @@ Streams 24/7 radio stations in-memory — zero music files saved to disk.
 
 Features:
  - Top Panel animated dancing cat icon with headphones (moves to the beat)
+ - Big Visual Dancing Cat Mascot inside the Control Panel UI (68x68 vector art)
  - Left-click panel icon -> Toggles interactive Mini Control UI Window
  - Independent Lofi volume control (separate from master system output)
- - Real-time Sound Wave Equalizer + Big Dancing Mascot in UI
+ - Real-time Sound Wave Equalizer
  - One-click buttons for all 9 diverse radio channels
  - Auto-starts with system on login
  - All-English UI interface
@@ -24,8 +25,9 @@ import gi
 gi.require_version('Gtk', '3.0')
 gi.require_version('Gst', '1.0')
 gi.require_version('Gdk', '3.0')
+gi.require_version('GdkPixbuf', '2.0')
 
-from gi.repository import Gtk, Gdk, Gst, GLib
+from gi.repository import Gtk, Gdk, Gst, GLib, GdkPixbuf
 from dasbus.connection import SessionMessageBus
 from dasbus.signal import Signal
 
@@ -90,20 +92,6 @@ STATIONS = [
     }
 ]
 
-# Mascot animation frames (Cat dancing with headphones)
-DANCING_MASCOTS = [
-    "  ( ˘ ³˘)ﾉ ♪",
-    " ~( ^ ﻌ ^ )~ ♫",
-    "  ( ＾ ﻌ ＾ ) ♬",
-    " ヽ( ^ ﻌ ^)ﾉ ♩",
-    "  ( ˘ ﻌ ˘ ) 🎶",
-    " ~( ＾ ﻌ ＾)~ ♪",
-    " ヽ( ˘ ﻌ ˘)ﾉ ♫",
-    "  ( ^ ﻌ ^ )ﾉ ♬"
-]
-
-SLEEPING_MASCOT = "  ( - ﻌ - ) z Z Z"
-
 POPUP_CSS = b"""
 window.lofi-popup {
     background: transparent;
@@ -111,7 +99,7 @@ window.lofi-popup {
 
 .popup-card {
     background: rgba(18, 18, 28, 0.96);
-    border: 1px solid rgba(168, 85, 247, 0.45);
+    border: 1px solid rgba(168, 85, 247, 0.5);
     border-radius: 20px;
     box-shadow: 0 16px 48px rgba(0, 0, 0, 0.85);
     padding: 14px 16px 16px 16px;
@@ -128,9 +116,9 @@ window.lofi-popup {
     font-size: 11px;
 }
 
-.mascot-text {
+.mascot-subtitle {
     color: #f472b6;
-    font-size: 16px;
+    font-size: 10px;
     font-weight: bold;
 }
 
@@ -219,7 +207,7 @@ progressbar.sound-bar trough {
     background: rgba(255, 255, 255, 0.05);
     border-radius: 3px;
     min-width: 4px;
-    min-height: 32px;
+    min-height: 38px;
 }
 
 progressbar.sound-bar progress {
@@ -342,7 +330,7 @@ class StatusNotifierItem(object):
         status_text = "Playing" if self.app.is_playing else "Paused"
         vol_pct = int(self.app.music_volume * 100)
         return ("", [], f"{st['name']} ({status_text}) - Volume: {vol_pct}%",
-                "Left-click: Toggle Control Panel\nScroll wheel: Change station")
+                "Left-click: Open Control Panel with Dancing Cat\nScroll wheel: Change station")
 
     def Activate(self, x, y):
         """Left-click on Panel icon: Toggle Mini Control UI Window"""
@@ -365,13 +353,13 @@ class StatusNotifierItem(object):
 
 
 class LofiControlWindow(Gtk.Window):
-    """Interactive Floating Mini Control Panel popup in English"""
+    """Interactive Floating Mini Control Panel popup in English with Dancing Cat Image"""
     def __init__(self, app):
         super().__init__(type=Gtk.WindowType.TOPLEVEL)
         self.app = app
 
         self.set_title("☕ Lofi Music Control")
-        self.set_default_size(360, 290)
+        self.set_default_size(360, 320)
         self.set_resizable(False)
         self.set_keep_above(True)
         self.set_decorated(False)
@@ -384,6 +372,22 @@ class LofiControlWindow(Gtk.Window):
             self.set_visual(visual)
 
         self.get_style_context().add_class("lofi-popup")
+
+        # Preload high-res dancing cat Pixbufs
+        self.cat_pixbufs = []
+        for i in range(4):
+            path = os.path.join(ICON_DIR, f"cat-dance-{i}.svg")
+            try:
+                pb = GdkPixbuf.Pixbuf.new_from_file_at_scale(path, 68, 68, True)
+                self.cat_pixbufs.append(pb)
+            except Exception as e:
+                print(f"Failed to load {path}: {e}", file=sys.stderr)
+
+        paused_path = os.path.join(ICON_DIR, "cat-dance-paused.svg")
+        try:
+            self.cat_pixbuf_paused = GdkPixbuf.Pixbuf.new_from_file_at_scale(paused_path, 68, 68, True)
+        except Exception:
+            self.cat_pixbuf_paused = self.cat_pixbufs[0] if self.cat_pixbufs else None
 
         self.setup_ui()
 
@@ -412,28 +416,44 @@ class LofiControlWindow(Gtk.Window):
         top_bar.pack_end(btn_close, False, False, 0)
         card.pack_start(top_bar, False, False, 0)
 
-        # --- ROW 2: Animated Mascot Cat & Sound Wave Equalizer ---
-        mid_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        # --- ROW 2: ANIMATED DANCING CAT IMAGE & Sound Wave Equalizer ---
+        mid_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=14)
         mid_box.set_valign(Gtk.Align.CENTER)
+        mid_box.set_halign(Gtk.Align.CENTER)
 
-        self.lbl_mascot = Gtk.Label(label=DANCING_MASCOTS[0])
-        self.lbl_mascot.get_style_context().add_class("mascot-text")
-        self.lbl_mascot.set_size_request(130, 36)
-        mid_box.pack_start(self.lbl_mascot, False, False, 0)
+        # Cat Container with Subtitle
+        cat_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+        cat_box.set_halign(Gtk.Align.CENTER)
+
+        initial_pb = self.cat_pixbufs[0] if self.cat_pixbufs else None
+        if initial_pb:
+            self.cat_image = Gtk.Image.new_from_pixbuf(initial_pb)
+        else:
+            self.cat_image = Gtk.Image.new_from_icon_name("audio-volume-high", Gtk.IconSize.DIALOG)
+
+        self.cat_image.set_size_request(68, 68)
+        cat_box.pack_start(self.cat_image, False, False, 0)
+
+        self.lbl_mascot_sub = Gtk.Label(label="Dancing to beat ♪")
+        self.lbl_mascot_sub.get_style_context().add_class("mascot-subtitle")
+        cat_box.pack_start(self.lbl_mascot_sub, False, False, 0)
+
+        mid_box.pack_start(cat_box, False, False, 4)
 
         # Sound Wave Equalizer (12 vertical bars)
         self.wave_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=3)
+        self.wave_box.set_valign(Gtk.Align.CENTER)
         self.bars = []
         for _ in range(12):
             bar = Gtk.ProgressBar(orientation=Gtk.Orientation.VERTICAL)
             bar.set_inverted(True)
             bar.set_fraction(0.1)
-            bar.set_size_request(4, 32)
+            bar.set_size_request(4, 40)
             bar.get_style_context().add_class("sound-bar")
             self.bars.append(bar)
             self.wave_box.pack_start(bar, False, False, 0)
 
-        mid_box.pack_end(self.wave_box, True, True, 0)
+        mid_box.pack_start(self.wave_box, False, False, 4)
         card.pack_start(mid_box, False, False, 2)
 
         # --- ROW 3: Big Playback Controls [⏮] [▶/⏸] [⏭] ---
@@ -467,7 +487,6 @@ class LofiControlWindow(Gtk.Window):
         lbl_vol_icon = Gtk.Label(label="🔈")
         vol_box.pack_start(lbl_vol_icon, False, False, 0)
 
-        # Independent volume slider: 0.0 to 1.0 (defaults to 0.20 = 20%)
         self.vol_scale = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, 0.0, 1.0, 0.05)
         self.vol_scale.set_value(self.app.music_volume)
         self.vol_scale.set_draw_value(False)
@@ -528,7 +547,14 @@ class LofiControlWindow(Gtk.Window):
 
     def update_animation(self, tick, frame_idx):
         if self.app.is_playing:
-            self.lbl_mascot.set_text(DANCING_MASCOTS[frame_idx])
+            # Animate cat image frame
+            if self.cat_pixbufs:
+                idx = frame_idx % len(self.cat_pixbufs)
+                self.cat_image.set_from_pixbuf(self.cat_pixbufs[idx])
+
+            subtitles = ["Dancing to beat ♪", "Vibing & chill ♫", "Grooving head ♬", "Bobbing ears ♩"]
+            self.lbl_mascot_sub.set_text(subtitles[frame_idx % len(subtitles)])
+
             # Waveform animation
             for i, bar in enumerate(self.bars):
                 val = 0.35 + 0.3 * math.sin(tick * 2.6 + i * 0.5) \
@@ -538,7 +564,9 @@ class LofiControlWindow(Gtk.Window):
                 cur = bar.get_fraction()
                 bar.set_fraction(cur + (target - cur) * 0.4)
         else:
-            self.lbl_mascot.set_text(SLEEPING_MASCOT)
+            if self.cat_pixbuf_paused:
+                self.cat_image.set_from_pixbuf(self.cat_pixbuf_paused)
+            self.lbl_mascot_sub.set_text("Sleeping z Z Z")
             for bar in self.bars:
                 cur = bar.get_fraction()
                 bar.set_fraction(cur + (0.05 - cur) * 0.25)
@@ -646,11 +674,10 @@ class LofiPanelApp:
             self.anim_frame = (self.anim_frame + 1) % 4
             self.sni.set_icon(f"lofi-cat-{self.anim_frame}")
 
-            # 2. Animate Mascot & Equalizer in Control UI
-            ui_mascot_frame = int(self.tick * 3.5) % len(DANCING_MASCOTS)
+            # 2. Animate Big Cat Mascot & Equalizer in Control UI
+            ui_mascot_frame = int(self.tick * 2.8) % 4
             self.ui_win.update_animation(self.tick, ui_mascot_frame)
         else:
-            # Sleeping cat icon on Panel and sleeping mascot in UI
             self.sni.set_icon("lofi-cat-paused")
             self.ui_win.update_animation(self.tick, 0)
 

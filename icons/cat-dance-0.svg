@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- Body/Chest -->
+  <ellipse cx="32" cy="54" rx="14" ry="8" fill="#e2e8f0"/>
+  <!-- Head -->
+  <g transform="translate(0, 0)">
+    <circle cx="32" cy="34" r="18" fill="#f8fafc"/>
+    <!-- Ears -->
+    <polygon points="16,24 22,10 29,20" fill="#f8fafc"/>
+    <polygon points="19,22 23,13 27,20" fill="#f472b6"/>
+    <polygon points="48,24 42,10 35,20" fill="#f8fafc"/>
+    <polygon points="45,22 41,13 37,20" fill="#f472b6"/>
+    <!-- Smiling Eyes (^ ^) -->
+    <path d="M 23 33 Q 27 28 30 33" stroke="#334155" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    <path d="M 34 33 Q 37 28 41 33" stroke="#334155" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    <!-- Nose & Mouth -->
+    <polygon points="31,37 33,37 32,39" fill="#f43f5e"/>
+    <path d="M 29 40 Q 32 43 35 40" stroke="#475569" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+    <!-- Rosy cheeks -->
+    <circle cx="21" cy="38" r="3" fill="#fca5a5" opacity="0.85"/>
+    <circle cx="43" cy="38" r="3" fill="#fca5a5" opacity="0.85"/>
+    <!-- Headphones Arc -->
+    <path d="M 13 32 A 20 20 0 0 1 51 32" stroke="#ec4899" stroke-width="4.5" fill="none" stroke-linecap="round"/>
+    <!-- Earcups -->
+    <rect x="10" y="27" width="5" height="12" rx="2.5" fill="#a855f7"/>
+    <rect x="49" y="27" width="5" height="12" rx="2.5" fill="#a855f7"/>
+  </g>
+  <!-- Floating Note -->
+  <text x="50" y="16" font-family="sans-serif" font-size="14" font-weight="bold" fill="#f472b6">♪</text>
+</svg>

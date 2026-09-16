@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 28 28" width="28" height="28">
+  <circle cx="12" cy="17" r="8" fill="#cbd5e1"/>
+  <polygon points="5,13 8,6 12,11" fill="#cbd5e1"/>
+  <polygon points="6.5,12 8.5,8 11,11" fill="#94a3b8"/>
+  <polygon points="19,13 16,6 12,11" fill="#cbd5e1"/>
+  <polygon points="17.5,12 15.5,8 13,11" fill="#94a3b8"/>
+  <!-- Sleeping flat eyes (- -) -->
+  <line x1="7.5" y1="17" x2="11.5" y2="17" stroke="#475569" stroke-width="1.4" stroke-linecap="round"/>
+  <line x1="13.5" y1="17" x2="17.5" y2="17" stroke="#475569" stroke-width="1.4" stroke-linecap="round"/>
+  <path d="M 3.5 16 A 9 9 0 0 1 20.5 16" stroke="#94a3b8" stroke-width="2" fill="none" stroke-linecap="round"/>
+  <rect x="2" y="14" width="2.5" height="6" rx="1.2" fill="#64748b"/>
+  <rect x="19.5" y="14" width="2.5" height="6" rx="1.2" fill="#64748b"/>
+  <!-- Little Zzz -->
+  <text x="21" y="10" font-family="sans-serif" font-size="8" font-weight="bold" fill="#94a3b8">z</text>
+  <text x="23.5" y="6" font-family="sans-serif" font-size="10" font-weight="bold" fill="#64748b">Z</text>
+</svg>

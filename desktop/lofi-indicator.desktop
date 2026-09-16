@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=Lofi Panel Radio
+Comment=Chill Lofi Radio directly on your Linux Top Panel
+Exec=/home/ryanphan/.local/bin/lofi-indicator
+Icon=/home/ryanphan/.local/share/lofi-panel/icons/lofi-wave-2.svg
+Terminal=false
+Type=Application
+Categories=AudioVideo;Audio;Player;
+Keywords=lofi;radio;panel;tray;music;ambient;

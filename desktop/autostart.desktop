@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Lofi Panel Radio
+Comment=Lofi Radio on Pop!_OS Top Panel with dancing cat
+Exec=/home/ryanphan/.local/bin/lofi-indicator
+Hidden=false
+NoDisplay=false
+X-GNOME-Autostart-enabled=true
+Icon=/home/ryanphan/.local/share/lofi-panel/icons/lofi-cat-2.svg
+Categories=AudioVideo;Audio;

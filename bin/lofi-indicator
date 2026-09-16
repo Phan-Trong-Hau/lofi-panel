@@ -1,0 +1,720 @@
+#!/usr/bin/env python3
+"""
+☕ Lofi Chill Top Panel Indicator & Mini Player for Pop!_OS (COSMIC Desktop)
+Lives directly inside your Linux Top Panel Status Bar.
+Streams 24/7 radio stations in-memory — zero music files saved to disk.
+
+Features:
+ - Top Panel animated dancing cat icon with headphones (moves to the beat)
+ - Left-click panel icon -> Toggles interactive Mini Control UI Window
+ - Independent Lofi volume control (separate from master system output)
+ - Real-time Sound Wave Equalizer + Big Dancing Mascot in UI
+ - One-click buttons for all 9 diverse radio channels
+ - Auto-starts with system on login
+ - All-English UI interface
+"""
+
+import sys
+import os
+import math
+import random
+import subprocess
+import gi
+
+gi.require_version('Gtk', '3.0')
+gi.require_version('Gst', '1.0')
+gi.require_version('Gdk', '3.0')
+
+from gi.repository import Gtk, Gdk, Gst, GLib
+from dasbus.connection import SessionMessageBus
+from dasbus.signal import Signal
+
+Gst.init(None)
+
+ICON_DIR = "/home/ryanphan/.local/share/lofi-panel/icons"
+
+STATIONS = [
+    {
+        "name": "☕ Lofi Hip Hop",
+        "genre": "Chill Beats & Study Vibes",
+        "url": "https://play.sas-media.ru/play_256",
+        "color": "#ec4899"
+    },
+    {
+        "name": "🌧️ Rainy Cafe",
+        "genre": "Cozy Piano, Rain & Lofi",
+        "url": "https://streams.ilovemusic.de/iloveradio17.mp3",
+        "color": "#38bdf8"
+    },
+    {
+        "name": "🌿 Groove Salad",
+        "genre": "Downtempo Ambient Chill",
+        "url": "https://ice1.somafm.com/groovesalad-128-mp3",
+        "color": "#34d399"
+    },
+    {
+        "name": "🌆 Nightwave Plaza",
+        "genre": "Vaporwave & Japanese City Pop",
+        "url": "https://radio.plaza.one/mp3",
+        "color": "#c084fc"
+    },
+    {
+        "name": "🌌 Deep Drone Zone",
+        "genre": "Atmospheric Space for Deep Coding",
+        "url": "https://ice1.somafm.com/dronezone-128-mp3",
+        "color": "#60a5fa"
+    },
+    {
+        "name": "🎷 Spy Jazz Lounge",
+        "genre": "Secret Agent & Bossa Nova",
+        "url": "https://ice1.somafm.com/secretagent-128-mp3",
+        "color": "#fbbf24"
+    },
+    {
+        "name": "🎹 Lush Mellow",
+        "genre": "Sensuous Electronic & Vocals",
+        "url": "https://ice1.somafm.com/lush-128-mp3",
+        "color": "#f87171"
+    },
+    {
+        "name": "🕹️ DEF CON Cyber",
+        "genre": "Hacker Synth & Chiptune Beats",
+        "url": "https://ice1.somafm.com/defcon-128-mp3",
+        "color": "#2dd4bf"
+    },
+    {
+        "name": "🪐 Vaporwaves",
+        "genre": "Dreamy Retro Synth & Chillwave",
+        "url": "https://ice1.somafm.com/vaporwaves-128-mp3",
+        "color": "#f43f5e"
+    }
+]
+
+# Mascot animation frames (Cat dancing with headphones)
+DANCING_MASCOTS = [
+    "  ( ˘ ³˘)ﾉ ♪",
+    " ~( ^ ﻌ ^ )~ ♫",
+    "  ( ＾ ﻌ ＾ ) ♬",
+    " ヽ( ^ ﻌ ^)ﾉ ♩",
+    "  ( ˘ ﻌ ˘ ) 🎶",
+    " ~( ＾ ﻌ ＾)~ ♪",
+    " ヽ( ˘ ﻌ ˘)ﾉ ♫",
+    "  ( ^ ﻌ ^ )ﾉ ♬"
+]
+
+SLEEPING_MASCOT = "  ( - ﻌ - ) z Z Z"
+
+POPUP_CSS = b"""
+window.lofi-popup {
+    background: transparent;
+}
+
+.popup-card {
+    background: rgba(18, 18, 28, 0.96);
+    border: 1px solid rgba(168, 85, 247, 0.45);
+    border-radius: 20px;
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.85);
+    padding: 14px 16px 16px 16px;
+}
+
+.title-text {
+    color: #ffffff;
+    font-size: 14px;
+    font-weight: 800;
+}
+
+.genre-text {
+    color: #a1a1aa;
+    font-size: 11px;
+}
+
+.mascot-text {
+    color: #f472b6;
+    font-size: 16px;
+    font-weight: bold;
+}
+
+.vol-label {
+    color: #cbd5e1;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.btn-ctrl {
+    background: rgba(255, 255, 255, 0.08);
+    color: #e4e4e7;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 50%;
+    min-width: 34px;
+    min-height: 34px;
+    padding: 0;
+    font-size: 13px;
+    transition: all 120ms ease;
+}
+
+.btn-ctrl:hover {
+    background: rgba(168, 85, 247, 0.4);
+    border-color: rgba(192, 132, 252, 0.7);
+    color: #ffffff;
+}
+
+.btn-main-play {
+    background: linear-gradient(135deg, #a855f7, #ec4899);
+    border: none;
+    color: #ffffff;
+    min-width: 42px;
+    min-height: 42px;
+    font-size: 16px;
+    box-shadow: 0 4px 16px rgba(236, 72, 153, 0.5);
+}
+
+.btn-main-play:hover {
+    background: linear-gradient(135deg, #c084fc, #f472b6);
+    box-shadow: 0 6px 22px rgba(236, 72, 153, 0.75);
+}
+
+.btn-close {
+    background: transparent;
+    border: none;
+    color: #71717a;
+    font-size: 13px;
+    min-width: 22px;
+    min-height: 22px;
+    padding: 0;
+    border-radius: 50%;
+}
+
+.btn-close:hover {
+    color: #f43f5e;
+    background: rgba(244, 63, 94, 0.2);
+}
+
+/* Station Buttons Grid */
+.station-btn {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    color: #94a3b8;
+    font-size: 11px;
+    padding: 5px 8px;
+    margin: 2px;
+    transition: all 120ms ease;
+}
+
+.station-btn:hover {
+    background: rgba(168, 85, 247, 0.25);
+    border-color: rgba(192, 132, 252, 0.45);
+    color: #ffffff;
+}
+
+.station-btn.active {
+    background: rgba(236, 72, 153, 0.25);
+    border: 1px solid #ec4899;
+    color: #f472b6;
+    font-weight: bold;
+}
+
+/* Sound Wave Bars */
+progressbar.sound-bar trough {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 3px;
+    min-width: 4px;
+    min-height: 32px;
+}
+
+progressbar.sound-bar progress {
+    background: linear-gradient(to top, #8b5cf6, #ec4899);
+    border-radius: 3px;
+    min-width: 4px;
+}
+
+/* Volume Slider */
+scale.vol-slider trough {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    min-height: 6px;
+}
+
+scale.vol-slider highlight {
+    background: linear-gradient(to right, #8b5cf6, #38bdf8);
+    border-radius: 4px;
+}
+
+scale.vol-slider slider {
+    background: #ffffff;
+    border-radius: 50%;
+    min-width: 14px;
+    min-height: 14px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+"""
+
+
+class StatusNotifierItem(object):
+    """FreeDesktop / KDE StatusNotifierItem for Linux Top Panel"""
+    __dbus_xml__ = """
+    <node>
+        <interface name='org.kde.StatusNotifierItem'>
+            <property name='Category' type='s' access='read'/>
+            <property name='Id' type='s' access='read'/>
+            <property name='Title' type='s' access='read'/>
+            <property name='Status' type='s' access='read'/>
+            <property name='IconName' type='s' access='read'/>
+            <property name='IconThemePath' type='s' access='read'/>
+            <property name='Menu' type='o' access='read'/>
+            <property name='ItemIsMenu' type='b' access='read'/>
+            <property name='ToolTip' type='(sa(iiay)ss)' access='read'/>
+            <method name='Activate'>
+                <arg name='x' type='i' direction='in'/>
+                <arg name='y' type='i' direction='in'/>
+            </method>
+            <method name='SecondaryActivate'>
+                <arg name='x' type='i' direction='in'/>
+                <arg name='y' type='i' direction='in'/>
+            </method>
+            <method name='ContextMenu'>
+                <arg name='x' type='i' direction='in'/>
+                <arg name='y' type='i' direction='in'/>
+            </method>
+            <method name='Scroll'>
+                <arg name='delta' type='i' direction='in'/>
+                <arg name='orientation' type='s' direction='in'/>
+            </method>
+            <signal name='NewTitle'/>
+            <signal name='NewIcon'/>
+            <signal name='NewToolTip'/>
+            <signal name='NewStatus'>
+                <arg name='status' type='s'/>
+            </signal>
+        </interface>
+    </node>
+    """
+
+    def __init__(self, app):
+        self.app = app
+        self.NewTitle = Signal()
+        self.NewIcon = Signal()
+        self.NewToolTip = Signal()
+        self.NewStatus = Signal()
+        self._current_icon = "lofi-cat-0"
+
+    @property
+    def Category(self):
+        return "ApplicationStatus"
+
+    @property
+    def Id(self):
+        return "lofi-chill-panel"
+
+    @property
+    def Title(self):
+        st = STATIONS[self.app.current_index]
+        return f"☕ {st['name']}"
+
+    @property
+    def Status(self):
+        return "Active"
+
+    @property
+    def IconName(self):
+        return self._current_icon
+
+    def set_icon(self, icon_name):
+        if self._current_icon != icon_name:
+            self._current_icon = icon_name
+            self.NewIcon.emit()
+
+    @property
+    def IconThemePath(self):
+        return ICON_DIR
+
+    @property
+    def Menu(self):
+        return "/MenuBar"
+
+    @property
+    def ItemIsMenu(self):
+        return False
+
+    @property
+    def ToolTip(self):
+        st = STATIONS[self.app.current_index]
+        status_text = "Playing" if self.app.is_playing else "Paused"
+        vol_pct = int(self.app.music_volume * 100)
+        return ("", [], f"{st['name']} ({status_text}) - Volume: {vol_pct}%",
+                "Left-click: Toggle Control Panel\nScroll wheel: Change station")
+
+    def Activate(self, x, y):
+        """Left-click on Panel icon: Toggle Mini Control UI Window"""
+        GLib.idle_add(self.app.toggle_ui)
+
+    def SecondaryActivate(self, x, y):
+        """Middle-click: Next Station"""
+        GLib.idle_add(self.app.next_station)
+
+    def ContextMenu(self, x, y):
+        """Right-click: Open Quick Menu"""
+        GLib.idle_add(self.app.show_menu, x, y)
+
+    def Scroll(self, delta, orientation):
+        """Mouse scroll on Panel icon: Switch station"""
+        if delta > 0:
+            GLib.idle_add(self.app.next_station)
+        else:
+            GLib.idle_add(self.app.prev_station)
+
+
+class LofiControlWindow(Gtk.Window):
+    """Interactive Floating Mini Control Panel popup in English"""
+    def __init__(self, app):
+        super().__init__(type=Gtk.WindowType.TOPLEVEL)
+        self.app = app
+
+        self.set_title("☕ Lofi Music Control")
+        self.set_default_size(360, 290)
+        self.set_resizable(False)
+        self.set_keep_above(True)
+        self.set_decorated(False)
+        self.set_app_paintable(True)
+
+        # Transparent visual
+        screen = self.get_screen()
+        visual = screen.get_rgba_visual()
+        if visual and screen.is_composited():
+            self.set_visual(visual)
+
+        self.get_style_context().add_class("lofi-popup")
+
+        self.setup_ui()
+
+    def setup_ui(self):
+        card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        card.get_style_context().add_class("popup-card")
+
+        # --- ROW 1: Header (Title, Close/Minimize) ---
+        top_bar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+
+        info_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=1)
+        self.lbl_title = Gtk.Label(xalign=0)
+        self.lbl_title.get_style_context().add_class("title-text")
+        self.lbl_genre = Gtk.Label(xalign=0)
+        self.lbl_genre.get_style_context().add_class("genre-text")
+
+        info_box.pack_start(self.lbl_title, True, True, 0)
+        info_box.pack_start(self.lbl_genre, True, True, 0)
+
+        btn_close = Gtk.Button(label="✕")
+        btn_close.get_style_context().add_class("btn-close")
+        btn_close.connect("clicked", lambda w: self.hide())
+        btn_close.set_tooltip_text("Minimize to Top Panel (Audio continues)")
+
+        top_bar.pack_start(info_box, True, True, 0)
+        top_bar.pack_end(btn_close, False, False, 0)
+        card.pack_start(top_bar, False, False, 0)
+
+        # --- ROW 2: Animated Mascot Cat & Sound Wave Equalizer ---
+        mid_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        mid_box.set_valign(Gtk.Align.CENTER)
+
+        self.lbl_mascot = Gtk.Label(label=DANCING_MASCOTS[0])
+        self.lbl_mascot.get_style_context().add_class("mascot-text")
+        self.lbl_mascot.set_size_request(130, 36)
+        mid_box.pack_start(self.lbl_mascot, False, False, 0)
+
+        # Sound Wave Equalizer (12 vertical bars)
+        self.wave_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=3)
+        self.bars = []
+        for _ in range(12):
+            bar = Gtk.ProgressBar(orientation=Gtk.Orientation.VERTICAL)
+            bar.set_inverted(True)
+            bar.set_fraction(0.1)
+            bar.set_size_request(4, 32)
+            bar.get_style_context().add_class("sound-bar")
+            self.bars.append(bar)
+            self.wave_box.pack_start(bar, False, False, 0)
+
+        mid_box.pack_end(self.wave_box, True, True, 0)
+        card.pack_start(mid_box, False, False, 2)
+
+        # --- ROW 3: Big Playback Controls [⏮] [▶/⏸] [⏭] ---
+        ctrl_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=14)
+        ctrl_box.set_halign(Gtk.Align.CENTER)
+
+        btn_prev = Gtk.Button(label="⏮")
+        btn_prev.get_style_context().add_class("btn-ctrl")
+        btn_prev.connect("clicked", lambda w: self.app.prev_station())
+        btn_prev.set_tooltip_text("Previous station")
+
+        self.btn_play = Gtk.Button(label="⏸")
+        self.btn_play.get_style_context().add_class("btn-ctrl")
+        self.btn_play.get_style_context().add_class("btn-main-play")
+        self.btn_play.connect("clicked", lambda w: self.app.toggle_playback())
+        self.btn_play.set_tooltip_text("Play / Pause")
+
+        btn_next = Gtk.Button(label="⏭")
+        btn_next.get_style_context().add_class("btn-ctrl")
+        btn_next.connect("clicked", lambda w: self.app.next_station())
+        btn_next.set_tooltip_text("Next station")
+
+        ctrl_box.pack_start(btn_prev, False, False, 0)
+        ctrl_box.pack_start(self.btn_play, False, False, 0)
+        ctrl_box.pack_start(btn_next, False, False, 0)
+        card.pack_start(ctrl_box, False, False, 2)
+
+        # --- ROW 4: INDEPENDENT MUSIC VOLUME SLIDER ---
+        vol_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+
+        lbl_vol_icon = Gtk.Label(label="🔈")
+        vol_box.pack_start(lbl_vol_icon, False, False, 0)
+
+        # Independent volume slider: 0.0 to 1.0 (defaults to 0.20 = 20%)
+        self.vol_scale = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, 0.0, 1.0, 0.05)
+        self.vol_scale.set_value(self.app.music_volume)
+        self.vol_scale.set_draw_value(False)
+        self.vol_scale.get_style_context().add_class("vol-slider")
+        self.vol_scale.connect("value-changed", self.on_volume_changed)
+        vol_box.pack_start(self.vol_scale, True, True, 0)
+
+        self.lbl_vol_pct = Gtk.Label(label=f"{int(self.app.music_volume * 100)}%")
+        self.lbl_vol_pct.get_style_context().add_class("vol-label")
+        self.lbl_vol_pct.set_size_request(34, -1)
+        vol_box.pack_start(self.lbl_vol_pct, False, False, 0)
+
+        card.pack_start(vol_box, False, False, 2)
+
+        # --- ROW 5: Direct Station Select Buttons ---
+        grid_label = Gtk.Label(label="Quick Station Select:", xalign=0)
+        grid_label.get_style_context().add_class("genre-text")
+        card.pack_start(grid_label, False, False, 2)
+
+        grid = Gtk.Grid()
+        grid.set_column_spacing(4)
+        grid.set_row_spacing(4)
+        grid.set_column_homogeneous(True)
+
+        self.station_buttons = []
+        for idx, st in enumerate(STATIONS):
+            btn = Gtk.Button(label=st["name"])
+            btn.get_style_context().add_class("station-btn")
+            btn.connect("clicked", lambda w, i=idx: self.app.select_station(i))
+            self.station_buttons.append(btn)
+            col = idx % 3
+            row = idx // 3
+            grid.attach(btn, col, row, 1, 1)
+
+        card.pack_start(grid, False, False, 2)
+
+        self.add(card)
+        self.update_display()
+
+    def on_volume_changed(self, scale):
+        val = scale.get_value()
+        self.app.set_volume(val)
+        self.lbl_vol_pct.set_text(f"{int(val * 100)}%")
+
+    def update_display(self):
+        st = STATIONS[self.app.current_index]
+        self.lbl_title.set_text(st["name"])
+        self.lbl_genre.set_text(st["genre"])
+        self.btn_play.set_label("⏸" if self.app.is_playing else "▶")
+
+        # Highlight active station button
+        for idx, btn in enumerate(self.station_buttons):
+            ctx = btn.get_style_context()
+            if idx == self.app.current_index:
+                ctx.add_class("active")
+            else:
+                ctx.remove_class("active")
+
+    def update_animation(self, tick, frame_idx):
+        if self.app.is_playing:
+            self.lbl_mascot.set_text(DANCING_MASCOTS[frame_idx])
+            # Waveform animation
+            for i, bar in enumerate(self.bars):
+                val = 0.35 + 0.3 * math.sin(tick * 2.6 + i * 0.5) \
+                           + 0.25 * math.cos(tick * 1.7 - i * 0.35) \
+                           + random.uniform(-0.06, 0.1)
+                target = max(0.1, min(0.98, val))
+                cur = bar.get_fraction()
+                bar.set_fraction(cur + (target - cur) * 0.4)
+        else:
+            self.lbl_mascot.set_text(SLEEPING_MASCOT)
+            for bar in self.bars:
+                cur = bar.get_fraction()
+                bar.set_fraction(cur + (0.05 - cur) * 0.25)
+
+
+class LofiPanelApp:
+    def __init__(self):
+        self.current_index = 0
+        self.is_playing = False
+        self.anim_frame = 0
+        self.tick = 0.0
+
+        # Default independent volume: 20% (ideal for background study/work)
+        self.music_volume = 0.20
+
+        # GStreamer Audio Player (Zero disk space, streaming directly in memory)
+        self.player = Gst.ElementFactory.make("playbin", "lofi_playbin")
+        self.player.set_property("volume", self.music_volume)
+        bus = self.player.get_bus()
+        bus.add_signal_watch()
+        bus.connect("message", self.on_gst_message)
+
+        # Interactive UI Control Window
+        self.ui_win = LofiControlWindow(self)
+
+        # Position window near top right (under top panel)
+        screen = Gdk.Screen.get_default()
+        self.ui_win.move(screen.get_width() - 380, 48)
+
+        # Setup DBus StatusNotifierItem on Top Panel
+        self.bus = SessionMessageBus()
+        self.sni = StatusNotifierItem(self)
+        self.bus.publish_object("/StatusNotifierItem", self.sni)
+
+        try:
+            watcher = self.bus.get_proxy("org.kde.StatusNotifierWatcher", "/StatusNotifierWatcher")
+            watcher.RegisterStatusNotifierItem(self.bus.connection.get_unique_name())
+            print("Successfully registered Lofi Cat Indicator on Top Panel!")
+        except Exception as e:
+            print(f"Warning: Could not register with StatusNotifierWatcher: {e}", file=sys.stderr)
+
+        # Combined Animation Timer (Panel icon + UI Window): ~180ms per frame
+        GLib.timeout_add(180, self.update_animation_loop)
+
+        # Start playing immediately
+        GLib.idle_add(self.start_playback)
+
+    def set_volume(self, val):
+        """Set independent music volume without affecting master PC volume"""
+        self.music_volume = max(0.0, min(1.0, val))
+        self.player.set_property("volume", self.music_volume)
+        self.sni.NewToolTip.emit()
+
+    def toggle_ui(self):
+        """Toggle the popup control window"""
+        if self.ui_win.get_visible():
+            self.ui_win.hide()
+        else:
+            screen = Gdk.Screen.get_default()
+            self.ui_win.move(screen.get_width() - 380, 48)
+            self.ui_win.show_all()
+            self.ui_win.present()
+
+    def start_playback(self):
+        st = STATIONS[self.current_index]
+        self.player.set_state(Gst.State.READY)
+        self.player.set_property("uri", st["url"])
+        self.player.set_property("volume", self.music_volume)
+        self.player.set_state(Gst.State.PLAYING)
+        self.is_playing = True
+        self.sni.NewTitle.emit()
+        self.sni.NewToolTip.emit()
+        self.ui_win.update_display()
+
+    def pause_playback(self):
+        self.player.set_state(Gst.State.PAUSED)
+        self.is_playing = False
+        self.sni.set_icon("lofi-cat-paused")
+        self.sni.NewToolTip.emit()
+        self.ui_win.update_display()
+
+    def toggle_playback(self):
+        if self.is_playing:
+            self.pause_playback()
+        else:
+            self.start_playback()
+
+    def next_station(self):
+        self.current_index = (self.current_index + 1) % len(STATIONS)
+        self.start_playback()
+
+    def prev_station(self):
+        self.current_index = (self.current_index - 1 + len(STATIONS)) % len(STATIONS)
+        self.start_playback()
+
+    def select_station(self, idx):
+        self.current_index = idx
+        self.start_playback()
+
+    def update_animation_loop(self):
+        self.tick += 0.15
+
+        if self.is_playing:
+            # 1. Animate Cat icon on Top Panel (frames 0..3)
+            self.anim_frame = (self.anim_frame + 1) % 4
+            self.sni.set_icon(f"lofi-cat-{self.anim_frame}")
+
+            # 2. Animate Mascot & Equalizer in Control UI
+            ui_mascot_frame = int(self.tick * 3.5) % len(DANCING_MASCOTS)
+            self.ui_win.update_animation(self.tick, ui_mascot_frame)
+        else:
+            # Sleeping cat icon on Panel and sleeping mascot in UI
+            self.sni.set_icon("lofi-cat-paused")
+            self.ui_win.update_animation(self.tick, 0)
+
+        return True
+
+    def on_gst_message(self, bus, message):
+        t = message.type
+        if t == Gst.MessageType.ERROR:
+            err, dbg = message.parse_error()
+            print(f"[Gst Stream Note] {err}", file=sys.stderr)
+            self.pause_playback()
+        elif t == Gst.MessageType.EOS:
+            self.start_playback()
+
+    def show_menu(self, x, y):
+        """Right-click menu on panel icon"""
+        menu = Gtk.Menu()
+
+        open_ui_item = Gtk.MenuItem(label="🎛 Open Control Panel")
+        open_ui_item.connect("activate", lambda w: self.toggle_ui())
+        menu.append(open_ui_item)
+
+        menu.append(Gtk.SeparatorMenuItem())
+
+        st = STATIONS[self.current_index]
+        cur_item = Gtk.MenuItem(label=f"🎵 {st['name']}")
+        cur_item.set_sensitive(False)
+        menu.append(cur_item)
+
+        play_item = Gtk.MenuItem(label="⏸ Pause" if self.is_playing else "▶ Play")
+        play_item.connect("activate", lambda w: self.toggle_playback())
+        menu.append(play_item)
+
+        next_item = Gtk.MenuItem(label="⏭ Next Station")
+        next_item.connect("activate", lambda w: self.next_station())
+        menu.append(next_item)
+
+        menu.append(Gtk.SeparatorMenuItem())
+
+        quit_item = Gtk.MenuItem(label="✕ Quit Lofi Radio")
+        quit_item.connect("activate", self.quit_app)
+        menu.append(quit_item)
+
+        menu.show_all()
+        menu.popup_at_pointer(None)
+
+    def quit_app(self, *args):
+        self.player.set_state(Gst.State.NULL)
+        Gtk.main_quit()
+        sys.exit(0)
+
+
+def main():
+    style_provider = Gtk.CssProvider()
+    style_provider.load_from_data(POPUP_CSS)
+    Gtk.StyleContext.add_provider_for_screen(
+        Gdk.Screen.get_default(),
+        style_provider,
+        Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+    )
+
+    app = LofiPanelApp()
+    Gtk.main()
+
+
+if __name__ == "__main__":
+    main()

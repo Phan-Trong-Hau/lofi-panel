@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+
+case "$1" in
+  stop)
+    pkill -f "lofi-indicator" 2>/dev/null && echo "⏹ Lofi Panel stopped." || echo "Lofi Panel is not running."
+    ;;
+  next)
+    python3 -c "
+import dbus
+bus = dbus.SessionBus()
+sni = bus.get_object('org.kde.StatusNotifierItem.lofi-chill-panel', '/StatusNotifierItem')
+sni.SecondaryActivate(0, 0, dbus_interface='org.kde.StatusNotifierItem')
+" 2>/dev/null && echo "⏭ Switched to next station." || echo "Lofi Panel is not running."
+    ;;
+  toggle|pause|play)
+    python3 -c "
+import dbus
+bus = dbus.SessionBus()
+sni = bus.get_object('org.kde.StatusNotifierItem.lofi-chill-panel', '/StatusNotifierItem')
+sni.Activate(0, 0, dbus_interface='org.kde.StatusNotifierItem')
+" 2>/dev/null && echo "⏯ Toggled Play / Pause." || echo "Lofi Panel is not running."
+    ;;
+  ui)
+    python3 -c "
+import dbus
+bus = dbus.SessionBus()
+sni = bus.get_object('org.kde.StatusNotifierItem.lofi-chill-panel', '/StatusNotifierItem')
+sni.Activate(0, 0, dbus_interface='org.kde.StatusNotifierItem')
+" 2>/dev/null || echo "Starting Lofi Panel..."
+    ;;
+  status)
+    if pgrep -f "lofi-indicator" >/dev/null; then
+      echo "● Lofi Radio is active on the Top Panel."
+    else
+      echo "○ Lofi Panel is currently inactive."
+    fi
+    ;;
+  start|"")
+    if pgrep -f "lofi-indicator" >/dev/null; then
+      echo "Lofi Panel is already active! Look at your top panel near the system tray."
+    else
+      DISPLAY=:1 WAYLAND_DISPLAY=wayland-1 nohup /home/ryanphan/.local/bin/lofi-indicator >/dev/null 2>&1 &
+      echo "▶ Lofi Radio started on Top Panel!"
+      echo "  - Left-click cat icon: Toggle Mini Control Panel"
+      echo "  - Scroll wheel / Middle-click: Next station"
+      echo "  - Right-click: Quick Menu"
+    fi
+    ;;
+esac

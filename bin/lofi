@@ -1,0 +1,283 @@
+#!/usr/bin/env bash
+
+# ==============================================================================
+#  ☕ lofi - Unified Lofi Radio Controller for Pop!_OS
+#  Gộp: Terminal Player + Floating Widget + Top Panel Indicator
+# ==============================================================================
+
+PID_FILE="/tmp/lofi_radio.pid"
+CURRENT_STATION_FILE="/tmp/lofi_station.txt"
+
+C_RESET="\033[0m"
+C_BOLD="\033[1m"
+C_CYAN="\033[38;5;51m"
+C_PINK="\033[38;5;213m"
+C_PURPLE="\033[38;5;141m"
+C_YELLOW="\033[38;5;228m"
+C_GREEN="\033[38;5;120m"
+C_DIM="\033[2m"
+C_RED="\033[38;5;203m"
+
+show_banner() {
+  clear
+  echo -e "${C_PINK}"
+  cat << "EOF"
+    __            _____ _       ________    _ ____
+   / /   ____    / __/(_)      / ____/ /_  (_) / /
+  / /   / __ \  / /_ / /      / /   / __ \/ / / /
+ / /___/ /_/ / / __// /      / /___/ / / / / / /
+/_____/\____/ /_/  /_/       \____/_/ /_/_/_/_/
+EOF
+  echo -e "${C_PURPLE}       ☕ Relax • Code • Chill in your Terminal 🎧${C_RESET}"
+  echo ""
+}
+
+# ── Helpers ────────────────────────────────────────────────────────────────────
+
+is_terminal_running() {
+  [ -f "$PID_FILE" ] && pid=$(cat "$PID_FILE" 2>/dev/null) && [ -n "$pid" ] && ps -p "$pid" > /dev/null 2>&1
+}
+
+is_panel_running() {
+  pgrep -f "lofi-indicator" > /dev/null 2>&1
+}
+
+# ── Stop ───────────────────────────────────────────────────────────────────────
+
+stop_all() {
+  local stopped=0
+
+  # Terminal player
+  if is_terminal_running; then
+    pid=$(cat "$PID_FILE")
+    kill "$pid" 2>/dev/null
+    pkill -P "$pid" 2>/dev/null
+    stopped=1
+  fi
+  pkill -f "gst-play-1.0.*somafm\|gst-play-1.0.*sas-media\|gst-play-1.0.*plaza.one\|gst-play-1.0.*iloveradio\|gst-play-1.0.*pianosolo\|gst-play-1.0.*antares" 2>/dev/null
+  rm -f "$PID_FILE" "$CURRENT_STATION_FILE"
+
+  # Panel indicator
+  if is_panel_running; then
+    pkill -f "lofi-indicator" 2>/dev/null
+    stopped=1
+  fi
+
+  if [ "$stopped" -eq 1 ]; then
+    echo -e "${C_YELLOW}⏹  Đã dừng tất cả lofi.${C_RESET}"
+  else
+    echo -e "${C_DIM}Không có lofi nào đang chạy.${C_RESET}"
+  fi
+}
+
+# ── Status ─────────────────────────────────────────────────────────────────────
+
+show_status() {
+  local any=0
+  if is_terminal_running; then
+    name=$(cat "$CURRENT_STATION_FILE" 2>/dev/null || echo "Radio Stream")
+    echo -e "${C_GREEN}● Terminal:${C_RESET} ${C_BOLD}$name${C_RESET} (PID: $(cat "$PID_FILE"))"
+    any=1
+  fi
+  if is_panel_running; then
+    echo -e "${C_GREEN}● Panel Indicator:${C_RESET} đang chạy trong top bar"
+    any=1
+  fi
+  [ "$any" -eq 0 ] && echo -e "${C_DIM}○ Không có lofi nào đang phát.${C_RESET}"
+}
+
+# ── Terminal player ────────────────────────────────────────────────────────────
+
+STATIONS=(
+  "☕ Lofi Hip Hop (Chill Beats)          | https://play.sas-media.ru/play_256"
+  "🌧️ Rainy Cafe & Chillhop               | https://streams.ilovemusic.de/iloveradio17.mp3"
+  "🌿 Groove Salad - SomaFM               | https://ice1.somafm.com/groovesalad-128-mp3"
+  "🌆 Nightwave Plaza (Vaporwave)          | https://radio.plaza.one/mp3"
+  "🌌 Drone Zone - SomaFM (Deep Ambient)  | https://ice1.somafm.com/dronezone-128-mp3"
+  "💜 Lush - SomaFM (Mellow Vocals)       | https://ice1.somafm.com/lush-128-mp3"
+  "🎹 Piano Solo 24/7                     | http://pianosolo.streamguys.net/live"
+  "🌊 Vaporwaves - SomaFM                 | https://ice1.somafm.com/vaporwaves-128-mp3"
+)
+
+play_terminal() {
+  local index=$1 bg_mode=$2
+  if [ -z "$index" ] || [ "$index" -lt 1 ] || [ "$index" -gt "${#STATIONS[@]}" ]; then
+    echo -e "${C_RED}Lựa chọn không hợp lệ! Hãy chọn từ 1 đến ${#STATIONS[@]}.${C_RESET}"
+    return 1
+  fi
+
+  stop_all > /dev/null 2>&1
+
+  local entry="${STATIONS[$((index-1))]}"
+  local name="${entry%% |*}"
+  local url="${entry##*| }"
+  name=$(echo "$name" | sed 's/[[:space:]]*$//')
+
+  echo "$name" > "$CURRENT_STATION_FILE"
+
+  if [ "$bg_mode" = "--bg" ]; then
+    nohup gst-play-1.0 --quiet --no-interactive --no-position "$url" >/dev/null 2>&1 &
+    echo $! > "$PID_FILE"
+    echo -e "${C_GREEN}▶ Đang phát ngầm:${C_RESET} ${C_BOLD}$name${C_RESET}"
+    echo -e "${C_DIM}Dùng 'lofi stop' để dừng.${C_RESET}"
+  else
+    show_banner
+    echo -e "${C_GREEN}▶ Đang phát:${C_RESET} ${C_BOLD}${C_CYAN}$name${C_RESET}"
+    echo -e "${C_DIM}Nhấn Ctrl+C để dừng.${C_RESET}\n"
+    gst-play-1.0 --no-position "$url" &
+    local ppid=$!
+    echo "$ppid" > "$PID_FILE"
+    trap "stop_all; exit 0" INT TERM
+    wait "$ppid" 2>/dev/null
+    rm -f "$PID_FILE" "$CURRENT_STATION_FILE"
+  fi
+}
+
+# ── Start panel / player ───────────────────────────────────────────────────────
+
+start_panel() {
+  if is_panel_running; then
+    echo -e "${C_YELLOW}● Panel đang chạy rồi (nhìn top bar).${C_RESET}"
+    return
+  fi
+  stop_all > /dev/null 2>&1
+  DISPLAY=:1 WAYLAND_DISPLAY=wayland-1 nohup lofi-indicator >/dev/null 2>&1 &
+  echo -e "${C_GREEN}▶ Lofi Panel đã khởi động!${C_RESET}"
+  echo -e "${C_DIM}  Click icon mèo trên top bar để điều khiển.${C_RESET}"
+}
+
+# ── Panel controls ─────────────────────────────────────────────────────────────
+
+panel_toggle() {
+  python3 -c "
+import dbus
+bus = dbus.SessionBus()
+sni = bus.get_object('org.kde.StatusNotifierItem.lofi-chill-panel', '/StatusNotifierItem')
+sni.Activate(0, 0, dbus_interface='org.kde.StatusNotifierItem')
+" 2>/dev/null && echo -e "${C_GREEN}⏯ Toggle Play/Pause.${C_RESET}" || echo -e "${C_RED}Panel không chạy.${C_RESET}"
+}
+
+panel_next() {
+  python3 -c "
+import dbus
+bus = dbus.SessionBus()
+sni = bus.get_object('org.kde.StatusNotifierItem.lofi-chill-panel', '/StatusNotifierItem')
+sni.SecondaryActivate(0, 0, dbus_interface='org.kde.StatusNotifierItem')
+" 2>/dev/null && echo -e "${C_GREEN}⏭ Đã chuyển kênh.${C_RESET}" || echo -e "${C_RED}Panel không chạy.${C_RESET}"
+}
+
+# ── Interactive menu ───────────────────────────────────────────────────────────
+
+interactive_menu() {
+  while true; do
+    show_banner
+    show_status
+    echo ""
+
+    echo -e "${C_BOLD}${C_PURPLE}=== Chọn chế độ phát ===${C_RESET}"
+    echo -e "  ${C_CYAN}[t]${C_RESET} 🖥️  Terminal Player  ${C_DIM}(nhạc phát trong terminal)${C_RESET}"
+    echo -e "  ${C_CYAN}[b]${C_RESET} 📌  Top Bar Panel    ${C_DIM}(icon mèo trong thanh trên)${C_RESET}"
+    echo -e ""
+    echo -e "  ${C_RED}[s]${C_RESET} ⏹  Dừng tất cả"
+    echo -e "  ${C_DIM}[q] Thoát${C_RESET}"
+    echo ""
+    echo -ne "${C_BOLD}Chọn [t/b/s/q]: ${C_RESET}"
+    read -r mode
+
+    case "$mode" in
+      t|T)
+        while true; do
+          show_banner
+          echo -e "${C_BOLD}Danh sách kênh:${C_RESET}"
+          local i=1
+          for entry in "${STATIONS[@]}"; do
+            local name="${entry%% |*}"
+            name=$(echo "$name" | sed 's/[[:space:]]*$//')
+            echo -e "  ${C_CYAN}[$i]${C_RESET} $name"
+            ((i++))
+          done
+          echo ""
+          echo -e "  ${C_PURPLE}[số]b${C_RESET}  Phát ngầm (vd: 1b)"
+          echo -e "  ${C_DIM}[q] Quay lại${C_RESET}"
+          echo ""
+          echo -ne "${C_BOLD}Chọn kênh [1-${#STATIONS[@]}]: ${C_RESET}"
+          read -r choice
+
+          case "$choice" in
+            q|Q) break ;;
+            [1-9]b)
+              num="${choice:0:1}"
+              play_terminal "$num" --bg
+              sleep 1; break
+              ;;
+            [1-9])
+              play_terminal "$choice"
+              break 2
+              ;;
+            *) echo -e "${C_RED}Không hợp lệ!${C_RESET}"; sleep 1 ;;
+          esac
+        done
+        ;;
+      b|B)
+        start_panel
+        sleep 1
+        ;;
+      s|S)
+        stop_all
+        sleep 1
+        ;;
+      q|Q|"")
+        echo -e "\n${C_PURPLE}Chúc bạn code vui! 👋${C_RESET}\n"
+        exit 0
+        ;;
+      *)
+        echo -e "${C_RED}Không hợp lệ!${C_RESET}"; sleep 1 ;;
+    esac
+  done
+}
+
+# ── Main ───────────────────────────────────────────────────────────────────────
+
+case "$1" in
+  stop)           stop_all ;;
+  status)         show_status ;;
+  panel)
+    case "$2" in
+      stop)              pkill -f lofi-indicator 2>/dev/null && echo "⏹ Panel stopped." || echo "Panel not running." ;;
+      next)              panel_next ;;
+      toggle|pause|play) panel_toggle ;;
+      *)                 start_panel ;;
+    esac
+    ;;
+  next)           panel_next ;;
+  toggle|pause)   panel_toggle ;;
+  play)
+    if [[ "$2" =~ ^[0-9]+$ ]]; then
+      if [ "$3" = "--bg" ]; then
+        play_terminal "$2" --bg
+      else
+        play_terminal "$2"
+      fi
+    else
+      interactive_menu
+    fi
+    ;;
+  help|-h|--help)
+    show_banner
+    echo -e "${C_BOLD}Cách dùng:${C_RESET}"
+    echo -e "  ${C_CYAN}lofi${C_RESET}                 → Mở menu chọn chế độ"
+    echo -e "  ${C_CYAN}lofi play [1-8]${C_RESET}      → Phát kênh terminal (có màn hình)"
+    echo -e "  ${C_CYAN}lofi play [1-8] --bg${C_RESET} → Phát kênh ngầm (tắt terminal vẫn nghe)"
+    echo -e "  ${C_CYAN}lofi panel${C_RESET}            → Bật icon mèo trên top bar"
+    echo -e "  ${C_CYAN}lofi panel stop${C_RESET}       → Tắt panel"
+    echo -e "  ${C_CYAN}lofi panel next${C_RESET}       → Chuyển kênh (panel)"
+    echo -e "  ${C_CYAN}lofi panel toggle${C_RESET}     → Pause/play (panel)"
+    echo -e "  ${C_CYAN}lofi stop${C_RESET}             → Dừng TẤT CẢ mọi lofi đang chạy"
+    echo -e "  ${C_CYAN}lofi status${C_RESET}           → Xem cái nào đang phát"
+    echo -e "  ${C_CYAN}lofi next${C_RESET}             → Chuyển kênh (panel)"
+    echo ""
+    ;;
+  *)
+    interactive_menu
+    ;;
+esac
